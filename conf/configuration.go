@@ -109,17 +109,30 @@ type MailerConfiguration struct {
 	URLPaths    EmailContentConfiguration `json:"url_paths"`
 }
 
+type SmsProviderConfiguration struct {
+	Provider string                      `json:"provider"`
+	Twilio   TwilioProviderConfiguration `json:"twilio"`
+}
+
+type TwilioProviderConfiguration struct {
+	AccountSid        string `json:"account_sid" split_words:"true"`
+	AuthToken         string `json:"auth_token" split_words:"true"`
+	MessageServiceSid string `json:"message_service_sid" split_words:"true"`
+}
+
 // Configuration holds all the per-instance configuration.
 type Configuration struct {
-	SiteURL           string                `json:"site_url" split_words:"true" required:"true"`
-	URIAllowList      []string              `json:"uri_allow_list" split_words:"true"`
-	PasswordMinLength int                   `json:"password_min_length" default:"6"`
-	JWT               JWTConfiguration      `json:"jwt"`
-	SMTP              SMTPConfiguration     `json:"smtp"`
-	Mailer            MailerConfiguration   `json:"mailer"`
-	External          ProviderConfiguration `json:"external"`
-	DisableSignup     bool                  `json:"disable_signup" split_words:"true"`
-	Webhook           WebhookConfig         `json:"webhook" split_words:"true"`
+	SiteURL           string                   `json:"site_url" split_words:"true" required:"true"`
+	URIAllowList      []string                 `json:"uri_allow_list" split_words:"true"`
+	PasswordMinLength int                      `json:"password_min_length" default:"6"`
+	JWT               JWTConfiguration         `json:"jwt"`
+	SMTP              SMTPConfiguration        `json:"smtp"`
+	Mailer            MailerConfiguration      `json:"mailer"`
+	External          ProviderConfiguration    `json:"external"`
+	Sms               SmsProviderConfiguration `json:"sms"`
+	EnablePhoneAuth   bool                     `json:"enable_phone_auth" split_words:"true"`
+	DisableSignup     bool                     `json:"disable_signup" split_words:"true"`
+	Webhook           WebhookConfig            `json:"webhook" split_words:"true"`
 	Cookie            struct {
 		Key      string `json:"key"`
 		Duration int    `json:"duration"`

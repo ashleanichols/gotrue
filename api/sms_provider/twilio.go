@@ -41,7 +41,7 @@ func NewTwilioProvider(config conf.TwilioProviderConfiguration) (SmsProvider, er
 // Send an SMS containing the OTP with Twilio's API
 func (t TwilioProvider) SendSms(phone string, otp string) error {
 	body := url.Values{
-		"To":      {"+" + phone},
+		"To":      {"+" + phone}, // twilio api requires "+" extension to be included
 		"Channel": {"sms"},
 		"From":    {t.Config.MessageServiceSid},
 		"Body":    {otp},

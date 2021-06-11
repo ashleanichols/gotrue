@@ -29,6 +29,9 @@ type User struct {
 	ConfirmedAt       *time.Time `json:"confirmed_at,omitempty" db:"confirmed_at"`
 	InvitedAt         *time.Time `json:"invited_at,omitempty" db:"invited_at"`
 
+	Phone            string     `json:"phone" db:"phone"`
+	PhoneConfirmedAt *time.Time `json:"phone_confirmed_at,omitempty" db:"phone_confirmed_at"`
+
 	ConfirmationToken  string     `json:"-" db:"confirmation_token"`
 	ConfirmationSentAt *time.Time `json:"confirmation_sent_at,omitempty" db:"confirmation_sent_at"`
 
@@ -48,6 +51,8 @@ type User struct {
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+
+	TotpSecret TotpSecret `has_one:"totp_secret"`
 }
 
 // NewUser initializes a new user from an email, password and user data.
@@ -266,6 +271,11 @@ func FindUserByConfirmationToken(tx *storage.Connection, token string) (*User, e
 // FindUserByEmailAndAudience finds a user with the matching email and audience.
 func FindUserByEmailAndAudience(tx *storage.Connection, instanceID uuid.UUID, email, aud string) (*User, error) {
 	return findUser(tx, "instance_id = ? and email = ? and aud = ?", instanceID, email, aud)
+}
+
+// FindUserByEmailAndAudience finds a user with the matching email and audience.
+func FindUserByPhoneAndAudience(tx *storage.Connection, instanceID uuid.UUID, phone, aud string) (*User, error) {
+	return findUser(tx, "instance_id = ? and phone = ? and aud = ?", instanceID, phone, aud)
 }
 
 // FindUserByID finds a user matching the provided ID.

@@ -17,6 +17,7 @@ type UserUpdateParams struct {
 	EmailChangeToken string                 `json:"email_change_token"`
 	Data             map[string]interface{} `json:"data"`
 	AppData          map[string]interface{} `json:"app_metadata,omitempty"`
+	Phone            string                 `json:"phone"`
 }
 
 // UserGet returns a user
@@ -87,6 +88,15 @@ func (a *API) UserUpdate(w http.ResponseWriter, r *http.Request) error {
 
 			if terr = user.UpdatePassword(tx, params.Password); terr != nil {
 				return internalServerError("Error during password storage").WithInternalError(terr)
+			}
+		}
+
+		if params.Phone != "" {
+			if isValid := a.validateE164Format(params.Phone); !isValid {
+				return unprocessableEntityError("Phone number should follow the E.164 format")
+			}
+			if terr = user.UpdatePhone(tx, params.Phone); terr != nil {
+				return internalServerError("Error updating phone").WithInternalError(terr)
 			}
 		}
 

@@ -110,8 +110,9 @@ type MailerConfiguration struct {
 }
 
 type SmsProviderConfiguration struct {
-	Provider string                      `json:"provider"`
-	Twilio   TwilioProviderConfiguration `json:"twilio"`
+	Autoconfirm bool                        `json:"autoconfirm"`
+	Provider    string                      `json:"provider"`
+	Twilio      TwilioProviderConfiguration `json:"twilio"`
 }
 
 type TwilioProviderConfiguration struct {

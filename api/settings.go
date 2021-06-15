@@ -23,7 +23,8 @@ type Settings struct {
 	ExternalProviders ProviderSettings `json:"external"`
 	ExternalLabels    ProviderLabels   `json:"external_labels"`
 	DisableSignup     bool             `json:"disable_signup"`
-	Autoconfirm       bool             `json:"autoconfirm"`
+	MailerAutoconfirm bool             `json:"mailer_autoconfirm"`
+	PhoneAutoconfirm  bool             `json:"phone_autoconfirm"`
 	SmsProvider       string           `json:"sms_provider"`
 	EnablePhoneAuth   bool             `json:"enable_phone_auth"`
 }
@@ -48,9 +49,10 @@ func (a *API) Settings(w http.ResponseWriter, r *http.Request) error {
 			SAML: config.External.Saml.Name,
 		},
 
-		DisableSignup:   config.DisableSignup,
-		Autoconfirm:     config.Mailer.Autoconfirm,
-		EnablePhoneAuth: config.EnablePhoneAuth,
-		SmsProvider:     config.Sms.Provider,
+		DisableSignup:     config.DisableSignup,
+		MailerAutoconfirm: config.Mailer.Autoconfirm,
+		PhoneAutoconfirm:  config.Sms.Autoconfirm,
+		EnablePhoneAuth:   config.EnablePhoneAuth,
+		SmsProvider:       config.Sms.Provider,
 	})
 }

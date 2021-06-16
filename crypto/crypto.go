@@ -47,7 +47,7 @@ func getEncryptionKey() string {
 }
 
 // EncryptSecret takes in a secret and encrypts it with a passphrase
-func EncryptSecret(secret []byte) string {
+func EncryptSecret(secret []byte) []byte {
 	key := getEncryptionKey()
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
@@ -59,8 +59,8 @@ func EncryptSecret(secret []byte) string {
 	}
 	nonce := make([]byte, aesGCM.NonceSize())
 	io.ReadFull(rand.Reader, nonce)
-	encryptedSecretString := string(aesGCM.Seal(nonce, nonce, secret, nil))
-	return encryptedSecretString
+	encryptedSecret := aesGCM.Seal(nonce, nonce, secret, nil)
+	return encryptedSecret
 }
 
 // DecryptSecret uses the passphrase to decrypt

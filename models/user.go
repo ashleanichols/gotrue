@@ -51,11 +51,10 @@ type User struct {
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-
-	TotpSecret TotpSecret `has_one:"totp_secret"`
 }
 
 // NewUser initializes a new user from an email, password and user data.
+// TODO: Refactor NewUser to take in phone as an arg
 func NewUser(instanceID uuid.UUID, email, password, aud string, userData map[string]interface{}) (*User, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
@@ -134,10 +133,16 @@ func (u *User) BeforeSave(tx *pop.Connection) error {
 	return nil
 }
 
-// IsConfirmed checks if a user has already being
+// IsConfirmed checks if a user has already been
 // registered and confirmed.
 func (u *User) IsConfirmed() bool {
 	return u.ConfirmedAt != nil
+}
+
+// IsPhoneConfirmed checks if a user's phone has already been
+// registered and confirmed.
+func (u *User) IsPhoneConfirmed() bool {
+	return u.PhoneConfirmedAt != nil
 }
 
 // SetRole sets the users Role to roleName
@@ -208,6 +213,11 @@ func (u *User) UpdatePassword(tx *storage.Connection, password string) error {
 	return tx.UpdateOnly(u, "encrypted_password")
 }
 
+func (u *User) UpdatePhone(tx *storage.Connection, phone string) error {
+	u.Phone = phone
+	return tx.UpdateOnly(u, "phone")
+}
+
 // Authenticate a user from a password
 func (u *User) Authenticate(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.EncryptedPassword), []byte(password))
@@ -220,6 +230,14 @@ func (u *User) Confirm(tx *storage.Connection) error {
 	now := time.Now()
 	u.ConfirmedAt = &now
 	return tx.UpdateOnly(u, "confirmation_token", "confirmed_at")
+}
+
+// Confirm resets the confimation token and the confirm timestamp
+func (u *User) ConfirmPhone(tx *storage.Connection) error {
+	u.ConfirmationToken = ""
+	now := time.Now()
+	u.PhoneConfirmedAt = &now
+	return tx.UpdateOnly(u, "confirmation_token", "phone_confirmed_at")
 }
 
 // UpdateLastSignInAt update field last_sign_in_at for user according to specified field

@@ -6,18 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
-	"github.com/netlify/gotrue/api/sms_provider"
-	"github.com/netlify/gotrue/crypto"
 	"github.com/netlify/gotrue/metering"
 	"github.com/netlify/gotrue/models"
 	"github.com/netlify/gotrue/storage"
-)
-
-const (
-	phoneProvider = "phone"
-	emailProvider = "email"
 )
 
 // SignupParams are the parameters the Signup endpoint accepts
@@ -58,37 +50,49 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 		return unprocessableEntityError("An email address or phone number is required")
 	}
 
-	primaryProvider := phoneProvider
+	primaryProvider := "phone"
 	if params.Email != "" {
 		if err := a.validateEmail(ctx, params.Email); err != nil {
 			return err
 		}
-		primaryProvider = emailProvider
+		primaryProvider = "email"
 	}
 
 	if params.Phone != "" {
 		if isValid := a.validateE164Format(params.Phone); !isValid {
 			return unprocessableEntityError("Invalid phone number format")
 		}
-		primaryProvider = phoneProvider
+		primaryProvider = "phone"
 	}
 
 	instanceID := getInstanceID(ctx)
 	params.Aud = a.requestAud(ctx, r)
-	user, err := models.FindUserByEmailAndAudience(a.db, instanceID, params.Email, params.Aud)
-	if err != nil && !models.IsNotFoundError(err) {
-		return internalServerError("Database error finding user").WithInternalError(err)
+	user, uerr := models.FindUserByEmailOrPhone(a.db, instanceID, params.Email, params.Phone, params.Aud)
+	if uerr != nil && !models.IsNotFoundError(uerr) {
+		return internalServerError("Database error finding user").WithInternalError(uerr)
 	}
 
 	err = a.db.Transaction(func(tx *storage.Connection) error {
 		var terr error
 		if user != nil {
-			if user.IsConfirmed() {
-				return badRequestError("A user with this email address has already been registered")
+			if user.IsConfirmed() || user.IsPhoneConfirmed() {
+				return badRequestError("A user with this email address or phone number has already been registered")
 			}
 
-			if user.IsPhoneConfirmed() {
-				return badRequestError("A user with this phone number has already been registered")
+			if user.GetEmail() == "" {
+				if err := user.SetEmail(tx, params.Email); err != nil {
+					return badRequestError("Database error updating user").WithInternalError(err)
+				}
+			} else if user.GetEmail() != params.Email {
+				return badRequestError("This email address has been taken")
+			}
+
+			if user.GetPhone() == "" {
+				if err := user.SetPhone(tx, params.Phone); err != nil {
+					return badRequestError("Database error updating user").WithInternalError(err)
+				}
+			} else if user.GetPhone() != params.Phone {
+				return badRequestError("This phone number has been taken")
 			}
 
 			if err := user.UpdateUserMetaData(tx, params.Data); err != nil {
@@ -102,7 +106,7 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 
-		if primaryProvider == emailProvider {
+		if user.GetEmail() != "" && !user.IsConfirmed() {
 			if config.Mailer.Autoconfirm {
 				if terr = models.NewAuditLogEntry(tx, instanceID, user, models.UserSignedUpAction, nil); terr != nil {
 					return terr
@@ -120,56 +124,20 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 					return internalServerError("Error sending confirmation mail").WithInternalError(terr)
 				}
 			}
-		} else if primaryProvider == phoneProvider {
+		}
+
+		if user.GetPhone() != "" && !user.IsPhoneConfirmed() {
 			if config.Sms.Autoconfirm {
 				if terr = user.ConfirmPhone(tx); terr != nil {
 					return internalServerError("Database error updating user").WithInternalError(terr)
 				}
 			} else {
-				var otp string
-				var secret string
-				totp, terr := models.FindTotpSecretByUserId(a.db, user.ID, instanceID)
 				smsParams := &SmsParams{
-					Email: params.Email,
-					Phone: params.Phone,
+					Email: user.GetEmail(),
+					Phone: user.GetPhone(),
 				}
-				if terr != nil {
-					if models.IsNotFoundError(terr) {
-						totp, err = a.createNewTOTPSecret(ctx, a.db, user, smsParams)
-						if err != nil {
-							return err
-						}
-						secret, err = crypto.DecryptSecret(totp.EncryptedSecret)
-						if err != nil {
-							return internalServerError("error decrypting secret").WithInternalError(err)
-						}
-					} else {
-						return internalServerError("error retrieving secret").WithInternalError(err)
-					}
-				} else {
-					// need to consider case of an unconfirmed existing user and resend otp
-					secret, err = crypto.DecryptSecret(totp.EncryptedSecret)
-					if err != nil {
-						return internalServerError("error decrypting secret").WithInternalError(err)
-					}
-				}
-				totp.OtpLastRequestedAt = time.Now()
-				otp, err = crypto.GenerateTOTP(secret, totp.OtpLastRequestedAt, 30)
-				if err != nil {
-					return internalServerError("error generating sms otp").WithInternalError(err)
-				}
-
-				if err := totp.UpdateOTPLastRequestedAt(a.db); err != nil {
-					return internalServerError("error updating otp_last_requested_at").WithInternalError(err)
-				}
-
-				smsProvider, err := sms_provider.GetSmsProvider(*config)
-				if err != nil {
-					return err
-				}
-
-				if serr := smsProvider.SendSms(smsParams.Phone, otp); serr != nil {
-					return serr
+				if terr = a.sendPhoneConfirmation(ctx, user, smsParams); terr != nil {
+					return internalServerError("Error sending confirmation sms").WithInternalError(terr)
 				}
 			}
 		}
@@ -237,7 +205,7 @@ func (a *API) signupNewUser(ctx context.Context, conn *storage.Connection, param
 	}
 
 	if params.Phone != "" {
-		user.Phone = params.Phone
+		user.Phone = storage.NullString(params.Phone)
 	}
 
 	err = conn.Transaction(func(tx *storage.Connection) error {

@@ -82,7 +82,7 @@ func (a *API) SendSmsOTP(w http.ResponseWriter, r *http.Request) error {
 	totp, terr := models.FindTotpSecretByUserId(a.db, user.ID, instanceID)
 	if terr != nil {
 		if models.IsNotFoundError(terr) {
-			totp, err = a.createNewTOTPSecret(ctx, a.db, user, params)
+			totp, err = a.createNewTotpSecret(ctx, a.db, user, params)
 			if err != nil {
 				return err
 			}
@@ -100,35 +100,34 @@ func (a *API) SendSmsOTP(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 	totp.OtpLastRequestedAt = time.Now()
-	otp, err = crypto.GenerateTOTP(secret, totp.OtpLastRequestedAt, 30)
+	otp, err = crypto.GenerateOtp(secret, totp.OtpLastRequestedAt, 30)
 	if err != nil {
 		return internalServerError("error generating sms otp").WithInternalError(err)
 	}
 
-	if err := totp.UpdateOTPLastRequestedAt(a.db); err != nil {
+	if err := totp.UpdateOtpLastRequestedAt(a.db); err != nil {
 		return internalServerError("error updating otp_last_requested_at").WithInternalError(err)
 	}
 
-	if !config.Sms.Autoconfirm {
-		if serr := smsProvider.SendSms(params.Phone, otp); serr != nil {
-			return serr
-		}
+	if serr := smsProvider.SendSms(params.Phone, otp); serr != nil {
+		return serr
 	}
 
 	return sendJSON(w, http.StatusOK, make(map[string]string))
 }
 
-func (a *API) createNewTOTPSecret(ctx context.Context, conn *storage.Connection, user *models.User, params *SmsParams) (*models.TotpSecret, error) {
+func (a *API) createNewTotpSecret(ctx context.Context, conn *storage.Connection, user *models.User, params *SmsParams) (*models.TotpSecret, error) {
 	instanceID := getInstanceID(ctx)
+	config := a.getConfig(ctx)
 
-	key, err := crypto.GenerateTOTPKey(params.Phone)
+	key, err := crypto.GenerateTotpKey(config, params.Phone)
 	if err != nil {
 		return nil, internalServerError("error creating totp key").WithInternalError(err)
 	}
 	totpSecret, err := models.NewTotpSecret(instanceID, user.ID, key.Secret())
 
 	terr := conn.Transaction(func(tx *storage.Connection) error {
-		verrs, err := tx.ValidateAndSave(totpSecret)
+		verrs, err := tx.ValidateAndCreate(totpSecret)
 		if verrs.Count() > 0 {
 			return internalServerError("Database error saving new totp secret").WithInternalError(verrs)
 		}

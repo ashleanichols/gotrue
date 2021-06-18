@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/netlify/gotrue/conf"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
@@ -81,17 +82,20 @@ func DecryptSecret(encryptedSecret []byte) (string, error) {
 	return string(secret), err
 }
 
-func GenerateTOTPKey(name string) (*otp.Key, error) {
+// GenerateTotpKey returns a key based on the config and user's accountName
+// which is either an email or phone number.
+func GenerateTotpKey(conf *conf.Configuration, accountName string) (*otp.Key, error) {
 	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "supabase.io",
-		AccountName: name,
+		Issuer:      conf.SiteURL,
+		AccountName: accountName,
 		Algorithm:   otp.AlgorithmSHA256,
 	})
 	return key, err
 }
 
-func GenerateTOTP(secret string, currentTime time.Time, expiry uint) (string, error) {
-	otp, err := totp.GenerateCodeCustom(secret, currentTime, totp.ValidateOpts{
+// GenerateOtp returns a 6 digit otp based on a totp secret and a timestamp
+func GenerateOtp(secret string, timestamp time.Time, expiry uint) (string, error) {
+	otp, err := totp.GenerateCodeCustom(secret, timestamp, totp.ValidateOpts{
 		Period:    expiry,
 		Digits:    otp.DigitsSix,
 		Algorithm: otp.AlgorithmSHA256,

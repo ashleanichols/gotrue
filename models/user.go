@@ -22,15 +22,15 @@ type User struct {
 	InstanceID uuid.UUID `json:"-" db:"instance_id"`
 	ID         uuid.UUID `json:"id" db:"id"`
 
-	Aud               string     `json:"aud" db:"aud"`
-	Role              string     `json:"role" db:"role"`
-	Email             string     `json:"email" db:"email"`
-	EncryptedPassword string     `json:"-" db:"encrypted_password"`
-	ConfirmedAt       *time.Time `json:"confirmed_at,omitempty" db:"confirmed_at"`
-	InvitedAt         *time.Time `json:"invited_at,omitempty" db:"invited_at"`
+	Aud               string             `json:"aud" db:"aud"`
+	Role              string             `json:"role" db:"role"`
+	Email             storage.NullString `json:"email" db:"email"`
+	EncryptedPassword string             `json:"-" db:"encrypted_password"`
+	ConfirmedAt       *time.Time         `json:"confirmed_at,omitempty" db:"confirmed_at"`
+	InvitedAt         *time.Time         `json:"invited_at,omitempty" db:"invited_at"`
 
-	Phone            string     `json:"phone" db:"phone"`
-	PhoneConfirmedAt *time.Time `json:"phone_confirmed_at,omitempty" db:"phone_confirmed_at"`
+	Phone            storage.NullString `json:"phone" db:"phone"`
+	PhoneConfirmedAt *time.Time         `json:"phone_confirmed_at,omitempty" db:"phone_confirmed_at"`
 
 	ConfirmationToken  string     `json:"-" db:"confirmation_token"`
 	ConfirmationSentAt *time.Time `json:"confirmation_sent_at,omitempty" db:"confirmation_sent_at"`
@@ -69,7 +69,7 @@ func NewUser(instanceID uuid.UUID, email, password, aud string, userData map[str
 		InstanceID:        instanceID,
 		ID:                id,
 		Aud:               aud,
-		Email:             email,
+		Email:             storage.NullString(email),
 		UserMetaData:      userData,
 		EncryptedPassword: pw,
 	}
@@ -156,6 +156,14 @@ func (u *User) HasRole(roleName string) bool {
 	return u.Role == roleName
 }
 
+func (u *User) GetEmail() string {
+	return string(u.Email)
+}
+
+func (u *User) GetPhone() string {
+	return string(u.Phone)
+}
+
 // UpdateUserMetaData sets all user data from a map of updates,
 // ensuring that it doesn't override attributes that are not
 // in the provided map.
@@ -191,8 +199,13 @@ func (u *User) UpdateAppMetaData(tx *storage.Connection, updates map[string]inte
 }
 
 func (u *User) SetEmail(tx *storage.Connection, email string) error {
-	u.Email = email
+	u.Email = storage.NullString(email)
 	return tx.UpdateOnly(u, "email")
+}
+
+func (u *User) SetPhone(tx *storage.Connection, phone string) error {
+	u.Phone = storage.NullString(phone)
+	return tx.UpdateOnly(u, "phone")
 }
 
 // hashPassword generates a hashed password from a plaintext string
@@ -214,7 +227,7 @@ func (u *User) UpdatePassword(tx *storage.Connection, password string) error {
 }
 
 func (u *User) UpdatePhone(tx *storage.Connection, phone string) error {
-	u.Phone = phone
+	u.Phone = storage.NullString(phone)
 	return tx.UpdateOnly(u, "phone")
 }
 
@@ -247,7 +260,7 @@ func (u *User) UpdateLastSignInAt(tx *storage.Connection) error {
 
 // ConfirmEmailChange confirm the change of email for a user
 func (u *User) ConfirmEmailChange(tx *storage.Connection) error {
-	u.Email = u.EmailChange
+	u.Email = storage.NullString(u.EmailChange)
 	u.EmailChange = ""
 	u.EmailChangeToken = ""
 	return tx.UpdateOnly(u, "email", "email_change", "email_change_token")
@@ -294,6 +307,10 @@ func FindUserByEmailAndAudience(tx *storage.Connection, instanceID uuid.UUID, em
 // FindUserByEmailAndAudience finds a user with the matching email and audience.
 func FindUserByPhoneAndAudience(tx *storage.Connection, instanceID uuid.UUID, phone, aud string) (*User, error) {
 	return findUser(tx, "instance_id = ? and phone = ? and aud = ?", instanceID, phone, aud)
+}
+
+func FindUserByEmailOrPhone(tx *storage.Connection, instanceID uuid.UUID, email, phone, aud string) (*User, error) {
+	return findUser(tx, "instance_id = ? and aud = ? and (phone = ? or email = ?)", instanceID, aud, phone, email)
 }
 
 // FindUserByID finds a user matching the provided ID.

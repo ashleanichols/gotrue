@@ -53,6 +53,6 @@ func FindTotpSecretByUserId(tx *storage.Connection, userID, instanceID uuid.UUID
 	return obj, nil
 }
 
-func (t *TotpSecret) UpdateOTPLastRequestedAt(tx *storage.Connection) error {
+func (t *TotpSecret) UpdateOtpLastRequestedAt(tx *storage.Connection) error {
 	return tx.UpdateOnly(t, "otp_last_requested_at")
 }

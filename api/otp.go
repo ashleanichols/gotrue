@@ -6,9 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/netlify/gotrue/api/sms_provider"
 	"github.com/netlify/gotrue/crypto"
 	"github.com/netlify/gotrue/models"
 	"github.com/netlify/gotrue/storage"
@@ -20,10 +18,10 @@ type SmsParams struct {
 	Phone string `json:"phone"`
 }
 
-func (a *API) OTP(w http.ResponseWriter, r *http.Request) error {
+func (a *API) Otp(w http.ResponseWriter, r *http.Request) error {
 	switch otpType := r.FormValue("type"); otpType {
 	case "sms":
-		return a.SendSmsOTP(w, r)
+		return a.SmsOtp(w, r)
 	case "magiclink":
 		return a.MagicLink(w, r)
 	default:
@@ -31,10 +29,9 @@ func (a *API) OTP(w http.ResponseWriter, r *http.Request) error {
 	}
 }
 
-// SendSmsOTP sends the user an OTP
-func (a *API) SendSmsOTP(w http.ResponseWriter, r *http.Request) error {
+// SmsOtp sends the user an otp via sms
+func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
-	config := a.getConfig(ctx)
 	instanceID := getInstanceID(ctx)
 
 	params := &SmsParams{}
@@ -45,11 +42,6 @@ func (a *API) SendSmsOTP(w http.ResponseWriter, r *http.Request) error {
 
 	if isValid := a.validateE164Format(params.Phone); !isValid {
 		return badRequestError("Invalid format: Phone number should follow the E.164 format")
-	}
-
-	smsProvider, err := sms_provider.GetSmsProvider(*config)
-	if err != nil {
-		return err
 	}
 
 	aud := a.requestAud(ctx, r)
@@ -73,44 +65,11 @@ func (a *API) SendSmsOTP(w http.ResponseWriter, r *http.Request) error {
 			}
 			return sendJSON(w, http.StatusOK, make(map[string]string))
 		}
-		return internalServerError("Database error finding user").WithInternalError(err)
+		return internalServerError("Database error finding user").WithInternalError(uerr)
 	}
 
-	var otp string
-	var secret string
-
-	totp, terr := models.FindTotpSecretByUserId(a.db, user.ID, instanceID)
-	if terr != nil {
-		if models.IsNotFoundError(terr) {
-			totp, err = a.createNewTotpSecret(ctx, a.db, user, params)
-			if err != nil {
-				return err
-			}
-			secret, err = crypto.DecryptSecret(totp.EncryptedSecret)
-			if err != nil {
-				return internalServerError("error decrypting secret").WithInternalError(err)
-			}
-		} else {
-			return internalServerError("error retrieving secret").WithInternalError(err)
-		}
-	} else {
-		secret, err = crypto.DecryptSecret(totp.EncryptedSecret)
-		if err != nil {
-			return internalServerError("error decrypting secret").WithInternalError(err)
-		}
-	}
-	totp.OtpLastRequestedAt = time.Now()
-	otp, err = crypto.GenerateOtp(secret, totp.OtpLastRequestedAt, 30)
-	if err != nil {
-		return internalServerError("error generating sms otp").WithInternalError(err)
-	}
-
-	if err := totp.UpdateOtpLastRequestedAt(a.db); err != nil {
-		return internalServerError("error updating otp_last_requested_at").WithInternalError(err)
-	}
-
-	if serr := smsProvider.SendSms(params.Phone, otp); serr != nil {
-		return serr
+	if err := a.sendPhoneConfirmation(ctx, user, params); err != nil {
+		return internalServerError("Error sending confirmation sms").WithInternalError(err)
 	}
 
 	return sendJSON(w, http.StatusOK, make(map[string]string))

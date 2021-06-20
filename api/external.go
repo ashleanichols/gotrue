@@ -183,7 +183,7 @@ func (a *API) internalExternalProviderCallback(w http.ResponseWriter, r *http.Re
 
 				params := &SignupParams{
 					Provider: providerType,
-					Email:    emailData.Email,
+					Username: emailData.Email,
 					Aud:      aud,
 					Data:     make(map[string]interface{}),
 				}

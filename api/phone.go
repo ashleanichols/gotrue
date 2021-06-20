@@ -19,7 +19,7 @@ func (a *API) validateE164Format(phone string) bool {
 	return matched
 }
 
-func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, smsParams *SmsParams) error {
+func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phone string) error {
 	instanceID := getInstanceID(ctx)
 	config := a.getConfig(ctx)
 
@@ -29,7 +29,7 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, smsP
 	var secret string
 	if err != nil {
 		if models.IsNotFoundError(err) {
-			totp, err = a.createNewTotpSecret(ctx, a.db, user, smsParams)
+			totp, err = a.createNewTotpSecret(ctx, a.db, user, phone)
 			if err != nil {
 				return err
 			}
@@ -57,7 +57,7 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, smsP
 		return err
 	}
 
-	if serr := smsProvider.SendSms(smsParams.Phone, otp); serr != nil {
+	if serr := smsProvider.SendSms(phone, otp); serr != nil {
 		return serr
 	}
 

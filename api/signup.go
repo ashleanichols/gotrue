@@ -14,11 +14,10 @@ import (
 
 // SignupParams are the parameters the Signup endpoint accepts
 type SignupParams struct {
-	Email    string                 `json:"email"`
+	Username string                 `json:"username"`
 	Password string                 `json:"password"`
-	Phone    string                 `json:"phone"`
 	Data     map[string]interface{} `json:"data"`
-	Provider string                 `json:"-"`
+	Provider string                 `json:"provider"`
 	Aud      string                 `json:"-"`
 }
 
@@ -46,67 +45,51 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 		return unprocessableEntityError(fmt.Sprintf("Password should be at least %d characters", config.PasswordMinLength))
 	}
 
-	if params.Email == "" && params.Phone == "" {
-		return unprocessableEntityError("An email address or phone number is required")
-	}
-
-	primaryProvider := "phone"
-	if params.Email != "" {
-		if err := a.validateEmail(ctx, params.Email); err != nil {
-			return err
-		}
-		primaryProvider = "email"
-	}
-
-	if params.Phone != "" {
-		if isValid := a.validateE164Format(params.Phone); !isValid {
-			return unprocessableEntityError("Invalid phone number format")
-		}
-		primaryProvider = "phone"
-	}
-
+	var user *models.User
 	instanceID := getInstanceID(ctx)
 	params.Aud = a.requestAud(ctx, r)
-	user, uerr := models.FindUserByEmailOrPhone(a.db, instanceID, params.Email, params.Phone, params.Aud)
-	if uerr != nil && !models.IsNotFoundError(uerr) {
-		return internalServerError("Database error finding user").WithInternalError(uerr)
+
+	switch params.Provider {
+	case "email":
+		if err := a.validateEmail(ctx, params.Username); err != nil {
+			return err
+		}
+		user, err = models.FindUserByEmailAndAudience(a.db, instanceID, params.Username, params.Aud)
+	case "phone":
+		if isValid := a.validateE164Format(params.Username); !isValid {
+			return unprocessableEntityError("Invalid phone number format")
+		}
+		user, err = models.FindUserByPhoneAndAudience(a.db, instanceID, params.Username, params.Aud)
+	default:
+		return unprocessableEntityError("Signup provider must be either email or phone")
+	}
+
+	if err != nil && !models.IsNotFoundError(err) {
+		return internalServerError("Database error finding user").WithInternalError(err)
 	}
 
 	err = a.db.Transaction(func(tx *storage.Connection) error {
 		var terr error
 		if user != nil {
-			if user.IsConfirmed() || user.IsPhoneConfirmed() {
-				return badRequestError("A user with this email address or phone number has already been registered")
+			if params.Provider == "email" && user.IsConfirmed() {
+				return badRequestError("A user with this email address has already been registered")
 			}
 
-			if user.GetEmail() == "" {
-				if err := user.SetEmail(tx, params.Email); err != nil {
-					return badRequestError("Database error updating user").WithInternalError(err)
-				}
-			} else if user.GetEmail() != params.Email {
-				return badRequestError("This email address has been taken")
-			}
-
-			if user.GetPhone() == "" {
-				if err := user.SetPhone(tx, params.Phone); err != nil {
-					return badRequestError("Database error updating user").WithInternalError(err)
-				}
-			} else if user.GetPhone() != params.Phone {
-				return badRequestError("This phone number has been taken")
+			if params.Provider == "phone" && user.IsPhoneConfirmed() {
+				return badRequestError("A user with this phone number has already been registered")
 			}
 
 			if err := user.UpdateUserMetaData(tx, params.Data); err != nil {
 				return internalServerError("Database error updating user").WithInternalError(err)
 			}
 		} else {
-			params.Provider = primaryProvider
 			user, terr = a.signupNewUser(ctx, tx, params)
 			if terr != nil {
 				return terr
 			}
 		}
 
-		if user.GetEmail() != "" && !user.IsConfirmed() {
+		if params.Provider == "email" && !user.IsConfirmed() {
 			if config.Mailer.Autoconfirm {
 				if terr = models.NewAuditLogEntry(tx, instanceID, user, models.UserSignedUpAction, nil); terr != nil {
 					return terr
@@ -124,19 +107,13 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 					return internalServerError("Error sending confirmation mail").WithInternalError(terr)
 				}
 			}
-		}
-
-		if user.GetPhone() != "" && !user.IsPhoneConfirmed() {
+		} else if params.Provider == "phone" && !user.IsPhoneConfirmed() {
 			if config.Sms.Autoconfirm {
 				if terr = user.ConfirmPhone(tx); terr != nil {
 					return internalServerError("Database error updating user").WithInternalError(terr)
 				}
 			} else {
-				smsParams := &SmsParams{
-					Email: user.GetEmail(),
-					Phone: user.GetPhone(),
-				}
-				if terr = a.sendPhoneConfirmation(ctx, user, smsParams); terr != nil {
+				if terr = a.sendPhoneConfirmation(ctx, user, params.Username); terr != nil {
 					return internalServerError("Error sending confirmation sms").WithInternalError(terr)
 				}
 			}
@@ -191,7 +168,19 @@ func (a *API) signupNewUser(ctx context.Context, conn *storage.Connection, param
 	instanceID := getInstanceID(ctx)
 	config := a.getConfig(ctx)
 
-	user, err := models.NewUser(instanceID, params.Email, params.Password, params.Aud, params.Data)
+	var user *models.User
+	var err error
+	switch params.Provider {
+	case "email":
+		user, err = models.NewUser(instanceID, params.Username, params.Password, params.Aud, params.Data)
+	case "phone":
+		user, err = models.NewUser(instanceID, "", params.Password, params.Aud, params.Data)
+		user.Phone = storage.NullString(params.Username)
+	default:
+		// handles external provider case
+		user, err = models.NewUser(instanceID, params.Username, params.Password, params.Aud, params.Data)
+	}
+
 	if err != nil {
 		return nil, internalServerError("Database error creating user").WithInternalError(err)
 	}
@@ -204,11 +193,12 @@ func (a *API) signupNewUser(ctx context.Context, conn *storage.Connection, param
 		user.EncryptedPassword = ""
 	}
 
-	if params.Phone != "" {
-		user.Phone = storage.NullString(params.Phone)
-	}
-
 	err = conn.Transaction(func(tx *storage.Connection) error {
+		if recoveryEmail, ok := params.Data["recovery_email"]; ok {
+			user.UserMetaData["recovery_email"] = fmt.Sprintf("%v", recoveryEmail)
+		} else {
+			user.UserMetaData["recovery_email"] = ""
+		}
 		if terr := tx.Create(user); terr != nil {
 			return internalServerError("Database error saving new user").WithInternalError(terr)
 		}

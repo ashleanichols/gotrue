@@ -54,7 +54,7 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 			if err != nil {
 				internalServerError("error creating user").WithInternalError(err)
 			}
-			newBodyContent := `{"email":"` + params.Email + `","phone":"` + params.Phone + `","password":"` + password + `"}`
+			newBodyContent := `{"username":"` + params.Phone + `","password":"` + password + `","provider":"phone"` + `,"data": {"recovery_email": "` + params.Email + `"}` + `}`
 			r.Body = ioutil.NopCloser(strings.NewReader(newBodyContent))
 			r.ContentLength = int64(len(newBodyContent))
 
@@ -68,18 +68,33 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 		return internalServerError("Database error finding user").WithInternalError(uerr)
 	}
 
-	if err := a.sendPhoneConfirmation(ctx, user, params); err != nil {
-		return internalServerError("Error sending confirmation sms").WithInternalError(err)
+	// update metadata with recovery email
+	err := a.db.Transaction(func(tx *storage.Connection) error {
+		metadata := make(map[string]interface{})
+		metadata["recovery_email"] = params.Email
+
+		if err := user.UpdateUserMetaData(tx, metadata); err != nil {
+			return internalServerError("Database error updating user").WithInternalError(err)
+		}
+
+		if err := a.sendPhoneConfirmation(ctx, user, params.Phone); err != nil {
+			return internalServerError("Error sending confirmation sms").WithInternalError(err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
 
 	return sendJSON(w, http.StatusOK, make(map[string]string))
 }
 
-func (a *API) createNewTotpSecret(ctx context.Context, conn *storage.Connection, user *models.User, params *SmsParams) (*models.TotpSecret, error) {
+func (a *API) createNewTotpSecret(ctx context.Context, conn *storage.Connection, user *models.User, phone string) (*models.TotpSecret, error) {
 	instanceID := getInstanceID(ctx)
 	config := a.getConfig(ctx)
 
-	key, err := crypto.GenerateTotpKey(config, params.Phone)
+	key, err := crypto.GenerateTotpKey(config, phone)
 	if err != nil {
 		return nil, internalServerError("error creating totp key").WithInternalError(err)
 	}

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/netlify/gotrue/api/sms_provider"
@@ -12,11 +13,16 @@ import (
 
 const e164Format = `^[1-9]\d{1,14}$`
 
-// Checks if phone number follows the E.164 format
+// validateE165Format checks if phone number follows the E.164 format
 func (a *API) validateE164Format(phone string) bool {
 	// match should never fail as long as regexp is valid
 	matched, _ := regexp.Match(e164Format, []byte(phone))
 	return matched
+}
+
+// formatPhoneNumber removes "+" and whitespaces in a phone number
+func (a *API) formatPhoneNumber(phone string) string {
+	return strings.ReplaceAll(strings.Trim(phone, "+"), " ", "")
 }
 
 func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phone string) error {

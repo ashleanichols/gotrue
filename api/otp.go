@@ -40,6 +40,8 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 		return badRequestError("Could not read sms otp params: %v", err)
 	}
 
+	params.Phone = a.formatPhoneNumber(params.Phone)
+
 	if isValid := a.validateE164Format(params.Phone); !isValid {
 		return badRequestError("Invalid format: Phone number should follow the E.164 format")
 	}

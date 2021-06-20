@@ -56,6 +56,7 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 		}
 		user, err = models.FindUserByEmailAndAudience(a.db, instanceID, params.Username, params.Aud)
 	case "phone":
+		params.Username = a.formatPhoneNumber(params.Username)
 		if isValid := a.validateE164Format(params.Username); !isValid {
 			return unprocessableEntityError("Invalid phone number format")
 		}

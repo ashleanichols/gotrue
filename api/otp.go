@@ -68,8 +68,10 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 		return internalServerError("Database error finding user").WithInternalError(uerr)
 	}
 
-	// update metadata with recovery email
 	err := a.db.Transaction(func(tx *storage.Connection) error {
+		if err := models.NewAuditLogEntry(tx, instanceID, user, models.UserRecoveryRequestedAction, nil); err != nil {
+			return err
+		}
 		metadata := make(map[string]interface{})
 		metadata["recovery_email"] = params.Email
 

@@ -109,6 +109,9 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 			}
 		} else if params.Provider == "phone" && !user.IsPhoneConfirmed() {
 			if config.Sms.Autoconfirm {
+				if terr = models.NewAuditLogEntry(tx, instanceID, user, models.UserSignedUpAction, nil); terr != nil {
+					return terr
+				}
 				if terr = user.ConfirmPhone(tx); terr != nil {
 					return internalServerError("Database error updating user").WithInternalError(terr)
 				}

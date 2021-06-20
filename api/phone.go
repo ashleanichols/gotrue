@@ -25,6 +25,10 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phon
 
 	totp, err := models.FindTotpSecretByUserId(a.db, user.ID, instanceID)
 
+	if totp != nil && totp.OtpLastRequestedAt.Add(config.Sms.MaxFrequency).Before(time.Now()) {
+		return MaxFrequencyLimitError
+	}
+
 	var otp string
 	var secret string
 	if err != nil {
@@ -42,7 +46,8 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phon
 		return internalServerError("error decrypting secret").WithInternalError(err)
 	}
 
-	totp.OtpLastRequestedAt = time.Now()
+	now := time.Now()
+	totp.OtpLastRequestedAt = &now
 	otp, err = crypto.GenerateOtp(secret, totp.OtpLastRequestedAt, 30)
 	if err != nil {
 		return internalServerError("error generating sms otp").WithInternalError(err)

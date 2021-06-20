@@ -94,8 +94,8 @@ func GenerateTotpKey(conf *conf.Configuration, accountName string) (*otp.Key, er
 }
 
 // GenerateOtp returns a 6 digit otp based on a totp secret and a timestamp
-func GenerateOtp(secret string, timestamp time.Time, expiry uint) (string, error) {
-	otp, err := totp.GenerateCodeCustom(secret, timestamp, totp.ValidateOpts{
+func GenerateOtp(secret string, timestamp *time.Time, expiry uint) (string, error) {
+	otp, err := totp.GenerateCodeCustom(secret, *timestamp, totp.ValidateOpts{
 		Period:    expiry,
 		Digits:    otp.DigitsSix,
 		Algorithm: otp.AlgorithmSHA256,

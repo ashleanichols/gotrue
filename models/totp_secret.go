@@ -12,13 +12,13 @@ import (
 )
 
 type TotpSecret struct {
-	ID                 int64     `db:"id"`
-	UserID             uuid.UUID `db:"user_id"`
-	InstanceID         uuid.UUID `db:"instance_id"`
-	EncryptedSecret    []byte    `db:"encrypted_secret"`
-	OtpLastRequestedAt time.Time `db:"otp_last_requested_at"`
-	CreatedAt          time.Time `db:"created_at"`
-	UpdatedAt          time.Time `db:"updated_at"`
+	ID                 int64      `db:"id"`
+	UserID             uuid.UUID  `db:"user_id"`
+	InstanceID         uuid.UUID  `db:"instance_id"`
+	EncryptedSecret    []byte     `db:"encrypted_secret"`
+	OtpLastRequestedAt *time.Time `db:"otp_last_requested_at"`
+	CreatedAt          time.Time  `db:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at"`
 }
 
 func (TotpSecret) TableName() string {
@@ -35,9 +35,10 @@ func (TotpSecret) TableName() string {
 func NewTotpSecret(instanceID, userID uuid.UUID, secret string) (*TotpSecret, error) {
 	encryptedSecret := crypto.EncryptSecret([]byte(secret))
 	totpSecret := &TotpSecret{
-		UserID:          userID,
-		InstanceID:      instanceID,
-		EncryptedSecret: encryptedSecret,
+		UserID:             userID,
+		InstanceID:         instanceID,
+		EncryptedSecret:    encryptedSecret,
+		OtpLastRequestedAt: nil,
 	}
 	return totpSecret, nil
 }

@@ -48,7 +48,7 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phon
 
 	now := time.Now()
 	totp.OtpLastRequestedAt = &now
-	otp, err = crypto.GenerateOtp(secret, totp.OtpLastRequestedAt, 30)
+	otp, err = crypto.GenerateOtp(secret, totp.OtpLastRequestedAt, config.Sms.OtpExp)
 	if err != nil {
 		return internalServerError("error generating sms otp").WithInternalError(err)
 	}

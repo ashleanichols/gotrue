@@ -112,6 +112,7 @@ type MailerConfiguration struct {
 type SmsProviderConfiguration struct {
 	Autoconfirm  bool                        `json:"autoconfirm"`
 	MaxFrequency time.Duration               `json:"max_frequency" split_words:"true"`
+	OtpExp       uint                        `json:"otp_exp" split_words:"true"`
 	Provider     string                      `json:"provider"`
 	Twilio       TwilioProviderConfiguration `json:"twilio"`
 }

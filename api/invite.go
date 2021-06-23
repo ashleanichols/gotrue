@@ -42,7 +42,7 @@ func (a *API) Invite(w http.ResponseWriter, r *http.Request) error {
 
 	err = a.db.Transaction(func(tx *storage.Connection) error {
 		signupParams := SignupParams{
-			Username: params.Email,
+			Email:    params.Email,
 			Data:     params.Data,
 			Aud:      aud,
 			Provider: "email",

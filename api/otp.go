@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -13,27 +14,40 @@ import (
 	"github.com/sethvargo/go-password/password"
 )
 
-type SmsParams struct {
+type OtpParams struct {
 	Email string `json:"email"`
 	Phone string `json:"phone"`
 }
 
+type SmsParams struct {
+	Phone string `json:"phone"`
+}
+
 func (a *API) Otp(w http.ResponseWriter, r *http.Request) error {
-	switch otpType := r.FormValue("type"); otpType {
-	case "sms":
-		return a.SmsOtp(w, r)
-	case "magiclink":
-		return a.MagicLink(w, r)
-	default:
-		return otpError("unsupported_otp_type", "")
+	params := &OtpParams{}
+	body, err := ioutil.ReadAll(r.Body)
+	jsonDecoder := json.NewDecoder(bytes.NewReader(body))
+	if err = jsonDecoder.Decode(params); err != nil {
+		return badRequestError("Could not read verification params: %v", err)
 	}
+	if params.Email != "" && params.Phone != "" {
+		return badRequestError("Only an emaill address or phone number should be provided")
+	}
+
+	r.Body = ioutil.NopCloser(strings.NewReader(string(body)))
+	if params.Email != "" {
+		return a.MagicLink(w, r)
+	} else if params.Phone != "" {
+		return a.SmsOtp(w, r)
+	}
+
+	return otpError("unsupported_otp_type", "")
 }
 
 // SmsOtp sends the user an otp via sms
 func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	instanceID := getInstanceID(ctx)
-
 	params := &SmsParams{}
 	jsonDecoder := json.NewDecoder(r.Body)
 	if err := jsonDecoder.Decode(params); err != nil {
@@ -56,7 +70,7 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 			if err != nil {
 				internalServerError("error creating user").WithInternalError(err)
 			}
-			newBodyContent := `{"username":"` + params.Phone + `","password":"` + password + `","provider":"phone"` + `,"data": {"recovery_email": "` + params.Email + `"}` + `}`
+			newBodyContent := `{"phone":"` + params.Phone + `","password":"` + password + `"}`
 			r.Body = ioutil.NopCloser(strings.NewReader(newBodyContent))
 			r.ContentLength = int64(len(newBodyContent))
 
@@ -73,12 +87,6 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 	err := a.db.Transaction(func(tx *storage.Connection) error {
 		if err := models.NewAuditLogEntry(tx, instanceID, user, models.UserRecoveryRequestedAction, nil); err != nil {
 			return err
-		}
-		metadata := make(map[string]interface{})
-		metadata["recovery_email"] = params.Email
-
-		if err := user.UpdateUserMetaData(tx, metadata); err != nil {
-			return internalServerError("Database error updating user").WithInternalError(err)
 		}
 
 		if err := a.sendPhoneConfirmation(ctx, user, params.Phone); err != nil {

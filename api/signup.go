@@ -14,10 +14,11 @@ import (
 
 // SignupParams are the parameters the Signup endpoint accepts
 type SignupParams struct {
-	Username string                 `json:"username"`
+	Email    string                 `json:"email"`
+	Phone    string                 `json:"phone"`
 	Password string                 `json:"password"`
 	Data     map[string]interface{} `json:"data"`
-	Provider string                 `json:"provider"`
+	Provider string                 `json:"-"`
 	Aud      string                 `json:"-"`
 }
 
@@ -44,6 +45,14 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 	if len(params.Password) < config.PasswordMinLength {
 		return unprocessableEntityError(fmt.Sprintf("Password should be at least %d characters", config.PasswordMinLength))
 	}
+	if params.Email != "" && params.Phone != "" {
+		return unprocessableEntityError("Only an email address or phone number should be provided on signup.")
+	}
+	if params.Email != "" {
+		params.Provider = "email"
+	} else if params.Phone != "" {
+		params.Provider = "phone"
+	}
 
 	var user *models.User
 	instanceID := getInstanceID(ctx)
@@ -51,16 +60,16 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 
 	switch params.Provider {
 	case "email":
-		if err := a.validateEmail(ctx, params.Username); err != nil {
+		if err := a.validateEmail(ctx, params.Email); err != nil {
 			return err
 		}
-		user, err = models.FindUserByEmailAndAudience(a.db, instanceID, params.Username, params.Aud)
+		user, err = models.FindUserByEmailAndAudience(a.db, instanceID, params.Email, params.Aud)
 	case "phone":
-		params.Username = a.formatPhoneNumber(params.Username)
-		if isValid := a.validateE164Format(params.Username); !isValid {
+		params.Phone = a.formatPhoneNumber(params.Phone)
+		if isValid := a.validateE164Format(params.Phone); !isValid {
 			return unprocessableEntityError("Invalid phone number format")
 		}
-		user, err = models.FindUserByPhoneAndAudience(a.db, instanceID, params.Username, params.Aud)
+		user, err = models.FindUserByPhoneAndAudience(a.db, instanceID, params.Phone, params.Aud)
 	default:
 		return unprocessableEntityError("Signup provider must be either email or phone")
 	}
@@ -117,7 +126,7 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 					return internalServerError("Database error updating user").WithInternalError(terr)
 				}
 			} else {
-				if terr = a.sendPhoneConfirmation(ctx, user, params.Username); terr != nil {
+				if terr = a.sendPhoneConfirmation(ctx, user, params.Phone); terr != nil {
 					return internalServerError("Error sending confirmation sms").WithInternalError(terr)
 				}
 			}
@@ -176,13 +185,13 @@ func (a *API) signupNewUser(ctx context.Context, conn *storage.Connection, param
 	var err error
 	switch params.Provider {
 	case "email":
-		user, err = models.NewUser(instanceID, params.Username, params.Password, params.Aud, params.Data)
+		user, err = models.NewUser(instanceID, params.Email, params.Password, params.Aud, params.Data)
 	case "phone":
 		user, err = models.NewUser(instanceID, "", params.Password, params.Aud, params.Data)
-		user.Phone = storage.NullString(params.Username)
+		user.Phone = storage.NullString(params.Phone)
 	default:
 		// handles external provider case
-		user, err = models.NewUser(instanceID, params.Username, params.Password, params.Aud, params.Data)
+		user, err = models.NewUser(instanceID, params.Email, params.Password, params.Aud, params.Data)
 	}
 
 	if err != nil {
@@ -198,11 +207,6 @@ func (a *API) signupNewUser(ctx context.Context, conn *storage.Connection, param
 	}
 
 	err = conn.Transaction(func(tx *storage.Connection) error {
-		if recoveryEmail, ok := params.Data["recovery_email"]; ok {
-			user.UserMetaData["recovery_email"] = fmt.Sprintf("%v", recoveryEmail)
-		} else {
-			user.UserMetaData["recovery_email"] = ""
-		}
 		if terr := tx.Create(user); terr != nil {
 			return internalServerError("Database error saving new user").WithInternalError(terr)
 		}

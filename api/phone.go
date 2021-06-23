@@ -31,7 +31,7 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phon
 
 	totp, err := models.FindTotpSecretByUserId(a.db, user.ID, instanceID)
 
-	if totp != nil && totp.OtpLastRequestedAt.Add(config.Sms.MaxFrequency).Before(time.Now()) {
+	if totp != nil && !totp.OtpLastRequestedAt.Add(config.Sms.MaxFrequency).Before(time.Now()) {
 		return MaxFrequencyLimitError
 	}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/netlify/gotrue/api/sms_provider"
 	"github.com/netlify/gotrue/crypto"
 	"github.com/netlify/gotrue/models"
+	"github.com/pquerna/otp"
 )
 
 const e164Format = `^[1-9]\d{1,14}$`
@@ -29,37 +30,41 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phon
 	instanceID := getInstanceID(ctx)
 	config := a.getConfig(ctx)
 
-	totp, err := models.FindTotpSecretByUserId(a.db, user.ID, instanceID)
+	totpAuth, err := models.FindTotpAuthByUserId(a.db, user.ID, instanceID)
 
-	if totp != nil && !totp.OtpLastRequestedAt.Add(config.Sms.MaxFrequency).Before(time.Now()) {
+	if totpAuth != nil && !totpAuth.OtpLastRequestedAt.Add(config.Sms.MaxFrequency).Before(time.Now()) {
 		return MaxFrequencyLimitError
 	}
 
-	var otp string
-	var secret string
+	var token string
+	var url string
 	if err != nil {
 		if models.IsNotFoundError(err) {
-			totp, err = a.createNewTotpSecret(ctx, a.db, user, phone)
+			totpAuth, err = a.createNewTotpAuth(ctx, a.db, user, phone)
 			if err != nil {
 				return err
 			}
 		} else {
-			return internalServerError("error retrieving secret").WithInternalError(err)
+			return internalServerError("error retrieving totp auth data").WithInternalError(err)
 		}
 	}
-	secret, err = crypto.DecryptSecret(totp.EncryptedSecret)
+	url, err = crypto.DecryptTotpUrl(totpAuth.EncryptedUrl)
 	if err != nil {
-		return internalServerError("error decrypting secret").WithInternalError(err)
+		return internalServerError("error decrypting url").WithInternalError(err)
+	}
+	key, err := otp.NewKeyFromURL(url)
+	if err != nil {
+		return internalServerError("error creating totp key").WithInternalError(err)
 	}
 
 	now := time.Now()
-	totp.OtpLastRequestedAt = &now
-	otp, err = crypto.GenerateOtp(secret, totp.OtpLastRequestedAt, config.Sms.OtpExp)
+	totpAuth.OtpLastRequestedAt = &now
+	token, err = crypto.GenerateOtp(key.Secret(), totpAuth.OtpLastRequestedAt, config.Sms.OtpExp)
 	if err != nil {
 		return internalServerError("error generating sms otp").WithInternalError(err)
 	}
 
-	if err := totp.UpdateOtpLastRequestedAt(a.db); err != nil {
+	if err := totpAuth.UpdateOtpLastRequestedAt(a.db); err != nil {
 		return internalServerError("error updating otp_last_requested_at").WithInternalError(err)
 	}
 
@@ -68,7 +73,7 @@ func (a *API) sendPhoneConfirmation(ctx context.Context, user *models.User, phon
 		return err
 	}
 
-	if serr := smsProvider.SendSms(phone, otp); serr != nil {
+	if serr := smsProvider.SendSms(phone, token); serr != nil {
 		return serr
 	}
 

@@ -102,7 +102,7 @@ func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 	return sendJSON(w, http.StatusOK, make(map[string]string))
 }
 
-func (a *API) createNewTotpSecret(ctx context.Context, conn *storage.Connection, user *models.User, phone string) (*models.TotpSecret, error) {
+func (a *API) createNewTotpAuth(ctx context.Context, conn *storage.Connection, user *models.User, phone string) (*models.TotpAuth, error) {
 	instanceID := getInstanceID(ctx)
 	config := a.getConfig(ctx)
 
@@ -110,20 +110,20 @@ func (a *API) createNewTotpSecret(ctx context.Context, conn *storage.Connection,
 	if err != nil {
 		return nil, internalServerError("error creating totp key").WithInternalError(err)
 	}
-	totpSecret, err := models.NewTotpSecret(instanceID, user.ID, key.Secret())
+	totpAuth, err := models.NewTotpAuth(instanceID, user.ID, key.String())
 
 	terr := conn.Transaction(func(tx *storage.Connection) error {
-		verrs, err := tx.ValidateAndCreate(totpSecret)
+		verrs, err := tx.ValidateAndCreate(totpAuth)
 		if verrs.Count() > 0 {
-			return internalServerError("Database error saving new totp secret").WithInternalError(verrs)
+			return internalServerError("Database error saving new totp auth data").WithInternalError(verrs)
 		}
 		if err != nil {
-			return internalServerError("Database error saving new totp secret").WithInternalError(err)
+			return internalServerError("Database error saving new totp auth data").WithInternalError(err)
 		}
 		return nil
 	})
 	if terr != nil {
 		return nil, terr
 	}
-	return totpSecret, nil
+	return totpAuth, nil
 }

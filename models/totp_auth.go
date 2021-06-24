@@ -11,18 +11,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-type TotpSecret struct {
+type TotpAuth struct {
 	ID                 int64      `db:"id"`
 	UserID             uuid.UUID  `db:"user_id"`
 	InstanceID         uuid.UUID  `db:"instance_id"`
-	EncryptedSecret    []byte     `db:"encrypted_secret"`
+	EncryptedUrl       []byte     `db:"encrypted_url"`
 	OtpLastRequestedAt *time.Time `db:"otp_last_requested_at"`
 	CreatedAt          time.Time  `db:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at"`
 }
 
-func (TotpSecret) TableName() string {
-	tableName := "totp_secrets"
+func (TotpAuth) TableName() string {
+	tableName := "totp_auth"
 
 	if namespace.GetNamespace() != "" {
 		return namespace.GetNamespace() + "_" + tableName
@@ -31,29 +31,29 @@ func (TotpSecret) TableName() string {
 	return tableName
 }
 
-// NewTotpSecret initializes a new TotpSecret from a userID and secret.
-func NewTotpSecret(instanceID, userID uuid.UUID, secret string) (*TotpSecret, error) {
-	encryptedSecret := crypto.EncryptSecret([]byte(secret))
-	totpSecret := &TotpSecret{
+// NewTotpAuth initializes a new TotpAuth from a userID and url containing the secret.
+func NewTotpAuth(instanceID, userID uuid.UUID, url string) (*TotpAuth, error) {
+	encryptedUrl := crypto.EncryptTotpUrl([]byte(url))
+	totpAuth := &TotpAuth{
 		UserID:             userID,
 		InstanceID:         instanceID,
-		EncryptedSecret:    encryptedSecret,
+		EncryptedUrl:       encryptedUrl,
 		OtpLastRequestedAt: nil,
 	}
-	return totpSecret, nil
+	return totpAuth, nil
 }
 
-func FindTotpSecretByUserId(tx *storage.Connection, userID, instanceID uuid.UUID) (*TotpSecret, error) {
-	obj := &TotpSecret{}
+func FindTotpAuthByUserId(tx *storage.Connection, userID, instanceID uuid.UUID) (*TotpAuth, error) {
+	obj := &TotpAuth{}
 	if err := tx.Q().Where("user_id = ? and instance_id = ?", userID, instanceID).First(obj); err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 			return nil, TotpSecretNotFoundError{}
 		}
-		return nil, errors.Wrap(err, "error finding totp secret")
+		return nil, errors.Wrap(err, "error retrieving totp auth data")
 	}
 	return obj, nil
 }
 
-func (t *TotpSecret) UpdateOtpLastRequestedAt(tx *storage.Connection) error {
+func (t *TotpAuth) UpdateOtpLastRequestedAt(tx *storage.Connection) error {
 	return tx.UpdateOnly(t, "otp_last_requested_at")
 }

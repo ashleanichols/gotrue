@@ -47,8 +47,8 @@ func getEncryptionKey() string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-// EncryptSecret takes in a secret and encrypts it with a passphrase
-func EncryptSecret(secret []byte) []byte {
+// EncryptTotpUrl takes in a url and encrypts it with a passphrase
+func EncryptTotpUrl(url []byte) []byte {
 	key := getEncryptionKey()
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
@@ -60,12 +60,12 @@ func EncryptSecret(secret []byte) []byte {
 	}
 	nonce := make([]byte, aesGCM.NonceSize())
 	io.ReadFull(rand.Reader, nonce)
-	encryptedSecret := aesGCM.Seal(nonce, nonce, secret, nil)
+	encryptedSecret := aesGCM.Seal(nonce, nonce, url, nil)
 	return encryptedSecret
 }
 
-// DecryptSecret uses the passphrase to decrypt
-func DecryptSecret(encryptedSecret []byte) (string, error) {
+// DecryptTotpUrl uses the passphrase to decrypt a url
+func DecryptTotpUrl(encryptedUrl []byte) (string, error) {
 	key := getEncryptionKey()
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
@@ -76,7 +76,7 @@ func DecryptSecret(encryptedSecret []byte) (string, error) {
 		return "", err
 	}
 	nonceSize := aesGCM.NonceSize()
-	nonce, ciphertext := encryptedSecret[:nonceSize], encryptedSecret[nonceSize:]
+	nonce, ciphertext := encryptedUrl[:nonceSize], encryptedUrl[nonceSize:]
 	secret, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 
 	return string(secret), err

@@ -3,10 +3,9 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -35,38 +34,44 @@ func removePadding(token string) string {
 	return strings.TrimRight(token, "=")
 }
 
-// Generate key used to encrypt totp secret
-func getEncryptionKey() string {
+// validatePassphrase retrieves the passphrase from the env file and checks if its 32 bytes long
+func validatePassphrase() (string, error) {
 	passphrase := &passphrase{}
-	err := envconfig.Process("gotrue", passphrase)
-	if err != nil {
-		panic(fmt.Errorf("GOTRUE_PASSPHRASE not found: %v", err))
+	if err := envconfig.Process("gotrue", passphrase); err != nil {
+		return "", fmt.Errorf("GOTRUE_PASSPHRASE not found: %v", err)
 	}
-	hasher := md5.New()
-	hasher.Write([]byte(passphrase.Value))
-	return hex.EncodeToString(hasher.Sum(nil))
+	if len(passphrase.Value) != 32 {
+		return "", errors.New("Passphrase must be 32 bytes long")
+	}
+	return passphrase.Value, nil
 }
 
 // EncryptTotpUrl takes in a url and encrypts it with a passphrase
-func EncryptTotpUrl(url []byte) []byte {
-	key := getEncryptionKey()
+func EncryptTotpUrl(url []byte) ([]byte, error) {
+	key, err := validatePassphrase()
+	if err != nil {
+		return nil, err
+	}
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 	nonce := make([]byte, aesGCM.NonceSize())
 	io.ReadFull(rand.Reader, nonce)
 	encryptedSecret := aesGCM.Seal(nonce, nonce, url, nil)
-	return encryptedSecret
+	return encryptedSecret, nil
 }
 
 // DecryptTotpUrl uses the passphrase to decrypt a url
 func DecryptTotpUrl(encryptedUrl []byte) (string, error) {
-	key := getEncryptionKey()
+	key, err := validatePassphrase()
+	if err != nil {
+		return "", err
+	}
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
 		return "", err

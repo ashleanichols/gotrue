@@ -33,7 +33,10 @@ func (TotpAuth) TableName() string {
 
 // NewTotpAuth initializes a new TotpAuth from a userID and url containing the secret.
 func NewTotpAuth(instanceID, userID uuid.UUID, url string) (*TotpAuth, error) {
-	encryptedUrl := crypto.EncryptTotpUrl([]byte(url))
+	encryptedUrl, err := crypto.EncryptTotpUrl([]byte(url))
+	if err != nil {
+		return nil, err
+	}
 	totpAuth := &TotpAuth{
 		UserID:             userID,
 		InstanceID:         instanceID,

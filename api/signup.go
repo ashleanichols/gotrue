@@ -122,11 +122,14 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 				if terr = models.NewAuditLogEntry(tx, instanceID, user, models.UserSignedUpAction, nil); terr != nil {
 					return terr
 				}
+				if terr = triggerEventHooks(ctx, tx, SignupEvent, user, instanceID, config); terr != nil {
+					return terr
+				}
 				if terr = user.ConfirmPhone(tx); terr != nil {
 					return internalServerError("Database error updating user").WithInternalError(terr)
 				}
 			} else {
-				if terr = a.sendPhoneConfirmation(ctx, user, params.Phone); terr != nil {
+				if terr = a.sendPhoneConfirmation(tx, ctx, user, params.Phone); terr != nil {
 					return internalServerError("Error sending confirmation sms").WithInternalError(terr)
 				}
 			}

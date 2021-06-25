@@ -9,10 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/netlify/gotrue/crypto"
 	"github.com/netlify/gotrue/models"
 	"github.com/netlify/gotrue/storage"
-	"github.com/pquerna/otp"
 	"github.com/sethvargo/go-password/password"
 )
 
@@ -244,28 +242,12 @@ func (a *API) smsVerify(ctx context.Context, conn *storage.Connection, params *V
 		}
 		return nil, internalServerError("Database error finding user").WithInternalError(err)
 	}
-	totpAuth, err := models.FindTotpAuthByUserId(conn, user.ID, instanceID)
-	if err != nil {
-		if models.IsNotFoundError(err) {
-			return nil, notFoundError(err.Error()).WithInternalError(redirectWithQueryError)
-		}
-		return nil, internalServerError("Database error invalid credentials").WithInternalError(err)
-	}
-	url, err := crypto.DecryptTotpUrl(totpAuth.EncryptedUrl)
-	if err != nil {
-		return nil, err
-	}
-	key, err := otp.NewKeyFromURL(url)
-	if err != nil {
-		return nil, err
-	}
 	now := time.Now()
-	currentOtp, err := crypto.GenerateOtp(key.Secret(), &now, config.Sms.OtpExp)
-	if err != nil {
-		return nil, err
-	}
-	if params.Token != currentOtp {
-		return nil, expiredTokenError("Otp has expired")
+	expiresAt := user.ConfirmationSentAt.Add(time.Second * time.Duration(config.Sms.OtpExp))
+
+	// check if token has expired or is invalid
+	if isOtpValid := now.Before(expiresAt); !isOtpValid || params.Token != user.ConfirmationToken {
+		return nil, expiredTokenError("Otp has expired or is invalid")
 	}
 
 	err = conn.Transaction(func(tx *storage.Connection) error {
@@ -278,7 +260,7 @@ func (a *API) smsVerify(ctx context.Context, conn *storage.Connection, params *V
 			return terr
 		}
 
-		if terr = user.Confirm(tx); terr != nil {
+		if terr = user.ConfirmPhone(tx); terr != nil {
 			return internalServerError("Error confirming user").WithInternalError(terr)
 		}
 		return nil

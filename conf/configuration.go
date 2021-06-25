@@ -81,14 +81,15 @@ type EmailContentConfiguration struct {
 
 type ProviderConfiguration struct {
 	Apple       OAuthProviderConfiguration `json:"apple"`
+	Azure       OAuthProviderConfiguration `json:"azure"`
 	Bitbucket   OAuthProviderConfiguration `json:"bitbucket"`
+	Facebook    OAuthProviderConfiguration `json:"facebook"`
 	Github      OAuthProviderConfiguration `json:"github"`
 	Gitlab      OAuthProviderConfiguration `json:"gitlab"`
 	Google      OAuthProviderConfiguration `json:"google"`
-	Facebook    OAuthProviderConfiguration `json:"facebook"`
 	Twitter     OAuthProviderConfiguration `json:"twitter"`
-	Azure       OAuthProviderConfiguration `json:"azure"`
 	Email       EmailProviderConfiguration `json:"email"`
+	Phone       PhoneProviderConfiguration `json:"phone"`
 	Saml        SamlProviderConfiguration  `json:"saml"`
 	RedirectURL string                     `json:"redirect_url"`
 }
@@ -107,6 +108,10 @@ type MailerConfiguration struct {
 	Subjects    EmailContentConfiguration `json:"subjects"`
 	Templates   EmailContentConfiguration `json:"templates"`
 	URLPaths    EmailContentConfiguration `json:"url_paths"`
+}
+
+type PhoneProviderConfiguration struct {
+	Disabled bool `json:"disabled"`
 }
 
 type SmsProviderConfiguration struct {
@@ -133,7 +138,6 @@ type Configuration struct {
 	Mailer            MailerConfiguration      `json:"mailer"`
 	External          ProviderConfiguration    `json:"external"`
 	Sms               SmsProviderConfiguration `json:"sms"`
-	EnablePhoneAuth   bool                     `json:"enable_phone_auth" split_words:"true"`
 	DisableSignup     bool                     `json:"disable_signup" split_words:"true"`
 	Webhook           WebhookConfig            `json:"webhook" split_words:"true"`
 	Cookie            struct {

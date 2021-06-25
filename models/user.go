@@ -237,7 +237,7 @@ func (u *User) Authenticate(password string) bool {
 	return err == nil
 }
 
-// Confirm resets the confimation token and the confirm timestamp
+// Confirm resets the confimation token and sets the confirm timestamp
 func (u *User) Confirm(tx *storage.Connection) error {
 	u.ConfirmationToken = ""
 	now := time.Now()
@@ -245,7 +245,7 @@ func (u *User) Confirm(tx *storage.Connection) error {
 	return tx.UpdateOnly(u, "confirmation_token", "confirmed_at")
 }
 
-// Confirm resets the confimation token and the confirm timestamp
+// ConfirmPhone resets the confimation token and sets the confirm timestamp
 func (u *User) ConfirmPhone(tx *storage.Connection) error {
 	u.ConfirmationToken = ""
 	now := time.Now()

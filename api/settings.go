@@ -12,6 +12,7 @@ type ProviderSettings struct {
 	Twitter   bool `json:"twitter"`
 	Azure     bool `json:"azure"`
 	Email     bool `json:"email"`
+	Phone     bool `json:"phone"`
 	SAML      bool `json:"saml"`
 }
 
@@ -26,7 +27,6 @@ type Settings struct {
 	MailerAutoconfirm bool             `json:"mailer_autoconfirm"`
 	PhoneAutoconfirm  bool             `json:"phone_autoconfirm"`
 	SmsProvider       string           `json:"sms_provider"`
-	EnablePhoneAuth   bool             `json:"enable_phone_auth"`
 }
 
 func (a *API) Settings(w http.ResponseWriter, r *http.Request) error {
@@ -43,6 +43,7 @@ func (a *API) Settings(w http.ResponseWriter, r *http.Request) error {
 			Twitter:   config.External.Twitter.Enabled,
 			Azure:     config.External.Azure.Enabled,
 			Email:     !config.External.Email.Disabled,
+			Phone:     !config.External.Phone.Disabled,
 			SAML:      config.External.Saml.Enabled,
 		},
 		ExternalLabels: ProviderLabels{
@@ -52,7 +53,6 @@ func (a *API) Settings(w http.ResponseWriter, r *http.Request) error {
 		DisableSignup:     config.DisableSignup,
 		MailerAutoconfirm: config.Mailer.Autoconfirm,
 		PhoneAutoconfirm:  config.Sms.Autoconfirm,
-		EnablePhoneAuth:   config.EnablePhoneAuth,
 		SmsProvider:       config.Sms.Provider,
 	})
 }

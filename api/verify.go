@@ -246,7 +246,7 @@ func (a *API) smsVerify(ctx context.Context, conn *storage.Connection, params *V
 	expiresAt := user.ConfirmationSentAt.Add(time.Second * time.Duration(config.Sms.OtpExp))
 
 	// check if token has expired or is invalid
-	if isOtpValid := now.Before(expiresAt); !isOtpValid || params.Token != user.ConfirmationToken {
+	if isOtpValid := now.Before(expiresAt) && params.Token == user.ConfirmationToken; !isOtpValid {
 		return nil, expiredTokenError("Otp has expired or is invalid")
 	}
 

@@ -60,11 +60,17 @@ func (a *API) Signup(w http.ResponseWriter, r *http.Request) error {
 
 	switch params.Provider {
 	case "email":
+		if config.External.Email.Disabled {
+			return badRequestError("Unsupported email provider")
+		}
 		if err := a.validateEmail(ctx, params.Email); err != nil {
 			return err
 		}
 		user, err = models.FindUserByEmailAndAudience(a.db, instanceID, params.Email, params.Aud)
 	case "phone":
+		if config.External.Phone.Disabled {
+			return badRequestError("Unsupported phone provider")
+		}
 		params.Phone = a.formatPhoneNumber(params.Phone)
 		if isValid := a.validateE164Format(params.Phone); !isValid {
 			return unprocessableEntityError("Invalid phone number format")

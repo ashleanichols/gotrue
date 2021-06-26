@@ -116,10 +116,10 @@ func NewAPIWithVersion(ctx context.Context, globalConfig *conf.GlobalConfigurati
 
 		r.With(api.requireAdminCredentials).Post("/invite", api.Invite)
 
-		r.With(api.requireEmailProvider).Post("/signup", api.Signup)
+		r.Post("/signup", api.Signup)
 		r.With(api.requireEmailProvider).Post("/recover", api.Recover)
-		r.With(api.requireEmailProvider).Post("/magiclink", api.MagicLink)
-		r.With(api.requireEmailProvider).Post("/otp", api.Otp)
+		r.Post("/magiclink", api.MagicLink)
+		r.Post("/otp", api.Otp)
 
 		r.With(api.requireEmailProvider).With(api.limitHandler(
 			// Allow requests at a rate of 30 per 5 minutes.

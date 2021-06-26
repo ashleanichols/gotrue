@@ -31,7 +31,7 @@ func (a *API) Otp(w http.ResponseWriter, r *http.Request) error {
 		return badRequestError("Could not read verification params: %v", err)
 	}
 	if params.Email != "" && params.Phone != "" {
-		return badRequestError("Only an emaill address or phone number should be provided")
+		return badRequestError("Only an email address or phone number should be provided")
 	}
 
 	r.Body = ioutil.NopCloser(strings.NewReader(string(body)))
@@ -47,6 +47,12 @@ func (a *API) Otp(w http.ResponseWriter, r *http.Request) error {
 // SmsOtp sends the user an otp via sms
 func (a *API) SmsOtp(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
+	config := a.getConfig(ctx)
+
+	if config.External.Phone.Disabled {
+		return badRequestError("Unsupported phone provider")
+	}
+
 	instanceID := getInstanceID(ctx)
 	params := &SmsParams{}
 	jsonDecoder := json.NewDecoder(r.Body)

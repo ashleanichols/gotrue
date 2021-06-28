@@ -83,6 +83,7 @@ type ProviderConfiguration struct {
 	Apple       OAuthProviderConfiguration `json:"apple"`
 	Azure       OAuthProviderConfiguration `json:"azure"`
 	Bitbucket   OAuthProviderConfiguration `json:"bitbucket"`
+	Discord     OAuthProviderConfiguration `json:"discord"`
 	Facebook    OAuthProviderConfiguration `json:"facebook"`
 	Github      OAuthProviderConfiguration `json:"github"`
 	Gitlab      OAuthProviderConfiguration `json:"gitlab"`

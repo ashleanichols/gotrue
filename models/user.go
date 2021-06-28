@@ -42,6 +42,10 @@ type User struct {
 	EmailChange       string     `json:"new_email,omitempty" db:"email_change"`
 	EmailChangeSentAt *time.Time `json:"email_change_sent_at,omitempty" db:"email_change_sent_at"`
 
+	PhoneChangeToken  string     `json:"-" db:"phone_change_token"`
+	PhoneChange       string     `json:"new_phone,omitempty" db:"phone_change"`
+	PhoneChangeSentAt *time.Time `json:"phone_change_sent_at,omitempty" db:"phone_change_sent_at"`
+
 	LastSignInAt *time.Time `json:"last_sign_in_at,omitempty" db:"last_sign_in_at"`
 
 	AppMetaData  JSONMap `json:"app_metadata" db:"raw_app_meta_data"`
@@ -126,6 +130,9 @@ func (u *User) BeforeSave(tx *pop.Connection) error {
 	}
 	if u.EmailChangeSentAt != nil && u.EmailChangeSentAt.IsZero() {
 		u.EmailChangeSentAt = nil
+	}
+	if u.PhoneChangeSentAt != nil && u.PhoneChangeSentAt.IsZero() {
+		u.PhoneChangeSentAt = nil
 	}
 	if u.LastSignInAt != nil && u.LastSignInAt.IsZero() {
 		u.LastSignInAt = nil
@@ -266,6 +273,16 @@ func (u *User) ConfirmEmailChange(tx *storage.Connection) error {
 	return tx.UpdateOnly(u, "email", "email_change", "email_change_token")
 }
 
+// ConfirmPhoneChange confirms the change of phone for a user
+func (u *User) ConfirmPhoneChange(tx *storage.Connection) error {
+	u.Phone = storage.NullString(u.PhoneChange)
+	u.PhoneChange = ""
+	u.PhoneChangeToken = ""
+	now := time.Now()
+	u.PhoneConfirmedAt = &now
+	return tx.UpdateOnly(u, "phone", "phone_change", "phone_change_token", "phone_confirmed_at")
+}
+
 // Recover resets the recovery token
 func (u *User) Recover(tx *storage.Connection) error {
 	u.RecoveryToken = ""
@@ -307,10 +324,6 @@ func FindUserByEmailAndAudience(tx *storage.Connection, instanceID uuid.UUID, em
 // FindUserByEmailAndAudience finds a user with the matching email and audience.
 func FindUserByPhoneAndAudience(tx *storage.Connection, instanceID uuid.UUID, phone, aud string) (*User, error) {
 	return findUser(tx, "instance_id = ? and phone = ? and aud = ?", instanceID, phone, aud)
-}
-
-func FindUserByEmailOrPhone(tx *storage.Connection, instanceID uuid.UUID, email, phone, aud string) (*User, error) {
-	return findUser(tx, "instance_id = ? and aud = ? and (phone = ? or email = ?)", instanceID, aud, phone, email)
 }
 
 // FindUserByID finds a user matching the provided ID.
@@ -374,9 +387,25 @@ func FindUsersInAudience(tx *storage.Connection, instanceID uuid.UUID, aud strin
 	return users, err
 }
 
+// FindUserWithPhoneAndPhoneChangeToken finds a user with the matching phone and phone change token
+func FindUserWithPhoneAndPhoneChangeToken(tx *storage.Connection, phone, token string) (*User, error) {
+	return findUser(tx, "phone = ? and phone_change_token = ?", phone, token)
+}
+
 // IsDuplicatedEmail returns whether a user exists with a matching email and audience.
 func IsDuplicatedEmail(tx *storage.Connection, instanceID uuid.UUID, email, aud string) (bool, error) {
 	_, err := FindUserByEmailAndAudience(tx, instanceID, email, aud)
+	if err != nil {
+		if IsNotFoundError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func IsDuplicatedPhone(tx *storage.Connection, instanceID uuid.UUID, phone, aud string) (bool, error) {
+	_, err := FindUserByPhoneAndAudience(tx, instanceID, phone, aud)
 	if err != nil {
 		if IsNotFoundError(err) {
 			return false, nil

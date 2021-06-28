@@ -20,11 +20,12 @@ var (
 )
 
 const (
-	signupVerification    = "signup"
-	recoveryVerification  = "recovery"
-	inviteVerification    = "invite"
-	magicLinkVerification = "magiclink"
-	smsVerification       = "sms"
+	signupVerification      = "signup"
+	recoveryVerification    = "recovery"
+	inviteVerification      = "invite"
+	magicLinkVerification   = "magiclink"
+	smsVerification         = "sms"
+	phoneChangeVerification = "phone_change"
 )
 
 // VerifyParams are the parameters the Verify endpoint accepts
@@ -89,6 +90,8 @@ func (a *API) Verify(w http.ResponseWriter, r *http.Request) error {
 			}
 			aud := a.requestAud(ctx, r)
 			user, terr = a.smsVerify(ctx, tx, params, aud)
+		case phoneChangeVerification:
+			user, terr = a.phoneChangeVerify(ctx, tx, params)
 		default:
 			return unprocessableEntityError("Verify requires a verification type")
 		}
@@ -265,6 +268,44 @@ func (a *API) smsVerify(ctx context.Context, conn *storage.Connection, params *V
 		}
 
 		if terr = user.ConfirmPhone(tx); terr != nil {
+			return internalServerError("Error confirming user").WithInternalError(terr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (a *API) phoneChangeVerify(ctx context.Context, conn *storage.Connection, params *VerifyParams) (*models.User, error) {
+	instanceID := getInstanceID(ctx)
+	config := a.getConfig(ctx)
+	user, err := models.FindUserWithPhoneAndPhoneChangeToken(conn, params.Phone, params.Token)
+	if err != nil {
+		if models.IsNotFoundError(err) {
+			return nil, notFoundError(err.Error()).WithInternalError(redirectWithQueryError)
+		}
+		return nil, internalServerError("Database error finding user").WithInternalError(err)
+	}
+	now := time.Now()
+	expiresAt := user.PhoneChangeSentAt.Add(time.Second * time.Duration(config.Sms.OtpExp))
+
+	if isOtpValid := now.Before(expiresAt) && params.Token == user.PhoneChangeToken; !isOtpValid {
+		return nil, expiredTokenError("Otp has expired or is invalid")
+	}
+
+	err = conn.Transaction(func(tx *storage.Connection) error {
+		var terr error
+		if terr = models.NewAuditLogEntry(tx, instanceID, user, models.UserSignedUpAction, nil); terr != nil {
+			return terr
+		}
+
+		if terr = triggerEventHooks(ctx, tx, SignupEvent, user, instanceID, config); terr != nil {
+			return terr
+		}
+
+		if terr = user.ConfirmPhoneChange(tx); terr != nil {
 			return internalServerError("Error confirming user").WithInternalError(terr)
 		}
 		return nil

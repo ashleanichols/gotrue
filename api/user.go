@@ -91,16 +91,6 @@ func (a *API) UserUpdate(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 
-		if params.Phone != "" {
-			params.Phone = a.formatPhoneNumber(params.Phone)
-			if isValid := a.validateE164Format(params.Phone); !isValid {
-				return unprocessableEntityError("Phone number should follow the E.164 format")
-			}
-			if terr = user.UpdatePhone(tx, params.Phone); terr != nil {
-				return internalServerError("Error updating phone").WithInternalError(terr)
-			}
-		}
-
 		if params.Data != nil {
 			if terr = user.UpdateUserMetaData(tx, params.Data); terr != nil {
 				return internalServerError("Error updating user").WithInternalError(terr)
@@ -143,6 +133,26 @@ func (a *API) UserUpdate(w http.ResponseWriter, r *http.Request) error {
 			referrer := a.getReferrer(r)
 			if terr = a.sendEmailChange(tx, user, mailer, params.Email, referrer); terr != nil {
 				return internalServerError("Error sending change email").WithInternalError(terr)
+			}
+		}
+
+		if params.Phone != "" {
+			params.Phone = a.formatPhoneNumber(params.Phone)
+			if params.Phone != user.GetPhone() {
+				if isValid := a.validateE164Format(params.Phone); !isValid {
+					return unprocessableEntityError("Phone number should follow the E.164 format")
+				}
+				var exists bool
+				if exists, terr = models.IsDuplicatedPhone(tx, instanceID, params.Phone, user.Aud); terr != nil {
+					return internalServerError("Database error checking phone").WithInternalError(terr)
+				} else if exists {
+					return unprocessableEntityError("Phone number already registered by another user")
+				}
+
+				// send update phone confirmation
+				if terr = a.sendPhoneChange(tx, ctx, user, params.Phone); terr != nil {
+					return internalServerError("Error sending change phone otp").WithInternalError(terr)
+				}
 			}
 		}
 

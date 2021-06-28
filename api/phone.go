@@ -62,3 +62,38 @@ func (a *API) sendPhoneConfirmation(tx *storage.Connection, ctx context.Context,
 
 	return errors.Wrap(tx.UpdateOnly(user, "confirmation_token", "confirmation_sent_at"), "Database error updating user for confirmation")
 }
+
+func (a *API) sendPhoneChange(tx *storage.Connection, ctx context.Context, user *models.User, phone string) error {
+	config := a.getConfig(ctx)
+
+	if user.PhoneChangeSentAt != nil && !user.PhoneChangeSentAt.Add(config.Sms.MaxFrequency).Before(time.Now()) {
+		return MaxFrequencyLimitError
+	}
+
+	key, err := crypto.GenerateTotpKey(config, phone)
+	if err != nil {
+		return internalServerError("error creating totp key").WithInternalError(err)
+	}
+
+	now := time.Now()
+	oldToken := user.PhoneChangeToken
+	user.PhoneChangeToken, err = crypto.GenerateOtp(key.Secret(), &now, config.Sms.OtpExp)
+	if err != nil {
+		user.PhoneChangeToken = oldToken
+		return internalServerError("error generating sms otp").WithInternalError(err)
+	}
+
+	smsProvider, err := sms_provider.GetSmsProvider(*config)
+	if err != nil {
+		return err
+	}
+
+	if serr := smsProvider.SendSms(phone, user.PhoneChangeToken); serr != nil {
+		user.PhoneChangeToken = oldToken
+		return serr
+	}
+	user.PhoneChange = phone
+	user.PhoneChangeSentAt = &now
+
+	return errors.Wrap(tx.UpdateOnly(user, "phone_change", "phone_change_token", "phone_change_sent_at"), "Database error updating user for phone update")
+}

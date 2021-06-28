@@ -92,6 +92,7 @@ func (a *API) UserUpdate(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		if params.Phone != "" {
+			params.Phone = a.formatPhoneNumber(params.Phone)
 			if isValid := a.validateE164Format(params.Phone); !isValid {
 				return unprocessableEntityError("Phone number should follow the E.164 format")
 			}

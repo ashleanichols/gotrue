@@ -26,7 +26,7 @@ type User struct {
 	Role              string             `json:"role" db:"role"`
 	Email             storage.NullString `json:"email" db:"email"`
 	EncryptedPassword string             `json:"-" db:"encrypted_password"`
-	ConfirmedAt       *time.Time         `json:"confirmed_at,omitempty" db:"confirmed_at"`
+	EmailConfirmedAt  *time.Time         `json:"email_confirmed_at,omitempty" db:"email_confirmed_at"`
 	InvitedAt         *time.Time         `json:"invited_at,omitempty" db:"invited_at"`
 
 	Phone            storage.NullString `json:"phone" db:"phone"`
@@ -112,8 +112,8 @@ func (u *User) BeforeSave(tx *pop.Connection) error {
 		return errors.New("Cannot persist system user")
 	}
 
-	if u.ConfirmedAt != nil && u.ConfirmedAt.IsZero() {
-		u.ConfirmedAt = nil
+	if u.EmailConfirmedAt != nil && u.EmailConfirmedAt.IsZero() {
+		u.EmailConfirmedAt = nil
 	}
 	if u.InvitedAt != nil && u.InvitedAt.IsZero() {
 		u.InvitedAt = nil
@@ -136,7 +136,7 @@ func (u *User) BeforeSave(tx *pop.Connection) error {
 // IsConfirmed checks if a user has already been
 // registered and confirmed.
 func (u *User) IsConfirmed() bool {
-	return u.ConfirmedAt != nil
+	return u.EmailConfirmedAt != nil
 }
 
 // IsPhoneConfirmed checks if a user's phone has already been
@@ -241,8 +241,8 @@ func (u *User) Authenticate(password string) bool {
 func (u *User) Confirm(tx *storage.Connection) error {
 	u.ConfirmationToken = ""
 	now := time.Now()
-	u.ConfirmedAt = &now
-	return tx.UpdateOnly(u, "confirmation_token", "confirmed_at")
+	u.EmailConfirmedAt = &now
+	return tx.UpdateOnly(u, "confirmation_token", "email_confirmed_at")
 }
 
 // ConfirmPhone resets the confimation token and sets the confirm timestamp

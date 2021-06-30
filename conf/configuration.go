@@ -246,6 +246,14 @@ func (config *Configuration) ApplyDefaults() {
 		config.SMTP.MaxFrequency = 1 * time.Minute
 	}
 
+	if config.Sms.MaxFrequency == 0 {
+		config.Sms.MaxFrequency = 1 * time.Minute
+	}
+
+	if config.Sms.OtpExp == 0 {
+		config.Sms.OtpExp = 30
+	}
+
 	if config.Cookie.Key == "" {
 		config.Cookie.Key = "nf_jwt"
 	}

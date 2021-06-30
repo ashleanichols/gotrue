@@ -262,6 +262,7 @@ func (ts *AdminTestSuite) TestAdminUserCreate() {
 	var buffer bytes.Buffer
 	require.NoError(ts.T(), json.NewEncoder(&buffer).Encode(map[string]interface{}{
 		"email":    "test1@example.com",
+		"phone":    "123456789",
 		"password": "test1",
 	}))
 
@@ -277,6 +278,7 @@ func (ts *AdminTestSuite) TestAdminUserCreate() {
 	data := models.User{}
 	require.NoError(ts.T(), json.NewDecoder(w.Body).Decode(&data))
 	assert.Equal(ts.T(), "test1@example.com", data.GetEmail())
+	assert.Equal(ts.T(), "123456789", data.GetPhone())
 	assert.Equal(ts.T(), "email", data.AppMetaData["provider"])
 }
 

@@ -251,7 +251,7 @@ func (config *Configuration) ApplyDefaults() {
 	}
 
 	if config.Sms.OtpExp == 0 {
-		config.Sms.OtpExp = 30
+		config.Sms.OtpExp = 60
 	}
 
 	if config.Cookie.Key == "" {

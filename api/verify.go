@@ -91,6 +91,13 @@ func (a *API) Verify(w http.ResponseWriter, r *http.Request) error {
 			aud := a.requestAud(ctx, r)
 			user, terr = a.smsVerify(ctx, tx, params, aud)
 		case phoneChangeVerification:
+			if params.Phone == "" {
+				return unprocessableEntityError("Sms Verification requires a phone number")
+			}
+			params.Phone = a.formatPhoneNumber(params.Phone)
+			if isValid := a.validateE164Format(params.Phone); !isValid {
+				return unprocessableEntityError("Invalid phone number format")
+			}
 			user, terr = a.phoneChangeVerify(ctx, tx, params)
 		default:
 			return unprocessableEntityError("Verify requires a verification type")

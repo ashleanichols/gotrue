@@ -63,7 +63,7 @@ type GlobalConfiguration struct {
 	DB                DBConfiguration
 	External          ProviderConfiguration
 	Logging           LoggingConfig `envconfig:"LOG"`
-	OperatorToken     string        `split_words:"true" required:"true"`
+	OperatorToken     string        `split_words:"true" required:"false"`
 	MultiInstanceMode bool
 	Tracing           TracingConfig
 	SMTP              SMTPConfiguration
@@ -89,6 +89,7 @@ type ProviderConfiguration struct {
 	Gitlab      OAuthProviderConfiguration `json:"gitlab"`
 	Google      OAuthProviderConfiguration `json:"google"`
 	Twitter     OAuthProviderConfiguration `json:"twitter"`
+	Twitch      OAuthProviderConfiguration `json:"twitch"`
 	Email       EmailProviderConfiguration `json:"email"`
 	Phone       PhoneProviderConfiguration `json:"phone"`
 	Saml        SamlProviderConfiguration  `json:"saml"`

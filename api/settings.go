@@ -11,6 +11,7 @@ type ProviderSettings struct {
 	GitLab    bool `json:"gitlab"`
 	Google    bool `json:"google"`
 	Facebook  bool `json:"facebook"`
+	Twitch    bool `json:"twitch"`
 	Twitter   bool `json:"twitter"`
 	Email     bool `json:"email"`
 	Phone     bool `json:"phone"`
@@ -43,6 +44,7 @@ func (a *API) Settings(w http.ResponseWriter, r *http.Request) error {
 			GitLab:    config.External.Gitlab.Enabled,
 			Google:    config.External.Google.Enabled,
 			Facebook:  config.External.Facebook.Enabled,
+			Twitch:    config.External.Twitch.Enabled,
 			Twitter:   config.External.Twitter.Enabled,
 			Email:     !config.External.Email.Disabled,
 			Phone:     !config.External.Phone.Disabled,

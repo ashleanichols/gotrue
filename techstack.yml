@@ -1,7 +1,8 @@
 repo_name: ashleanichols/gotrue
 report_id: 929dbb4be3265fe0c8b788b7d649cf64
+version: 0.1
 repo_type: Public
-timestamp: '2023-11-09T16:54:52+00:00'
+timestamp: '2024-01-04T15:07:22+00:00'
 requested_by: kangmingtay
 provider: github
 branch: master
@@ -17,6 +18,7 @@ tools:
   category: Languages & Frameworks
   sub_category: Languages
   image_url: https://img.stackshare.io/service/1005/O6AczwfV_400x400.png
+  detection_source_url: https://github.com/ashleanichols/gotrue
   detection_source: Repo Metadata
 - name: SQL
   description: It is a domain-specific language used in programming
@@ -26,7 +28,8 @@ tools:
   category: Languages & Frameworks
   sub_category: Languages
   image_url: https://img.stackshare.io/service/2271/default_068d33483bba6b81ee13fbd4dc7aab9780896a54.png
-  detection_source: migrations_postgres/schema.sql
+  detection_source_url: https://github.com/ashleanichols/gotrue/blob/master/migrations/20171026211738_create_users.down.sql
+  detection_source: migrations/20171026211738_create_users.down.sql
   last_updated_by: Bryce Kahle
   last_updated_on: 2018-01-23 21:39:58.000000000 Z
 - name: MySQL
@@ -37,6 +40,7 @@ tools:
   category: Data Stores
   sub_category: Databases
   image_url: https://img.stackshare.io/service/1025/logo-mysql-170x170.png
+  detection_source_url: https://github.com/ashleanichols/gotrue/blob/master/go.mod
   detection_source: go.mod
   last_updated_by: Asaduzzaman Pavel
   last_updated_on: 2018-10-16 21:08:59.000000000 Z
@@ -49,6 +53,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Virtual Machine Platforms & Containers
   image_url: https://img.stackshare.io/service/586/n4u37v9t_400x400.png
+  detection_source_url: https://github.com/ashleanichols/gotrue
   detection_source: Repo Metadata
 - name: Git
   description: Fast, scalable, distributed revision control system
@@ -58,6 +63,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Version Control System
   image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/ashleanichols/gotrue
   detection_source: Repo Metadata
 - name: GitHub Actions
   description: Automate your workflow from idea to production
@@ -67,6 +73,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Continuous Integration
   image_url: https://img.stackshare.io/service/11563/actions.png
+  detection_source_url: https://github.com/ashleanichols/gotrue/blob/master/.github/workflows/release.yml
   detection_source: ".github/workflows/release.yml"
   last_updated_by: Paul Copplestone
   last_updated_on: 2020-09-21 00:54:57.000000000 Z
@@ -80,6 +87,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Go Testing
   image_url: https://img.stackshare.io/service/8695/stretchr.png
+  detection_source_url: https://github.com/ashleanichols/gotrue/blob/master/go.mod
   detection_source: go.mod
   last_updated_by: Sergio Moya
   last_updated_on: 2020-12-14 08:57:56.000000000 Z
@@ -92,6 +100,7 @@ tools:
   category: Application Utilities
   sub_category: Static Web Hosting
   image_url: https://img.stackshare.io/service/2748/default_5dfbb146cf22182bca88c7d07f2515a5888fc12a.jpg
+  detection_source_url: https://github.com/ashleanichols/gotrue/blob/master/netlify.toml
   detection_source: netlify.toml
   last_updated_by: Marcus Weiner
   last_updated_on: 2020-02-12 01:39:39.000000000 Z
@@ -104,4 +113,5 @@ tools:
   category: Languages & Frameworks
   sub_category: Languages
   image_url: https://img.stackshare.io/service/4631/default_c2062d40130562bdc836c13dbca02d318205a962.png
+  detection_source_url: https://github.com/ashleanichols/gotrue
   detection_source: Repo Metadata
